@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/danidoble/dobleColorsCss@master/doblecolors.min.css">
+    <title>Error interno del servidor</title>
+    <style>
+        html, body {
+            /*background-color: #fff;*/
+            color: #636b6f;
+            font-family: 'Nunito', sans-serif;
+            font-weight: 100;
+            height: 100vh;
+            margin: 0;
+        }
+        .full-height {
+            height: 80vh;
+        }
+        .flex-center {
+            align-items: center;
+            display: flex;
+            justify-content: center;
+        }
+        .position-ref {
+            position: relative;
+        }
+        .code {
+            border-right: 2px solid;
+            font-size: 26px;
+            padding: 0 15px 0 15px;
+            text-align: center;
+        }
+        .message {
+            font-size: 18px;
+            text-align: center;
+        }
+        .message-2 {
+            font-size: .8em;
+            text-align: center;
+        }
+
+        .credits{
+            position: absolute;
+            bottom: 5px;
+            left: 5px;
+            font-size: .6em;
+        }
+        .credits:before{
+            content: 'Creado por danidoble 2020'
+        }
+    </style>
+</head>
+<body>
+<div class="flex-center position-ref full-height">
+    <div class="code">500</div>
+    <div class="message text-tw-red-600" style="padding: 10px;">Error interno del servidor</div>
+</div>
+<div class="message-2" style="padding: 10px;">
+    Tenemos problemas para acceder a este recurso!
+    <br>
+    Por favor intenta m&aacute; tarde. </div>
+<div class="text-tw-gray-500 credits"></div>
+</body>
+</html>

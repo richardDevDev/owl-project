@@ -1,0 +1,6 @@
+[09-Aug-2021 23:16:15 UTC] PHP Deprecated:  Non-static method includes::_includePHP() should not be called statically in /home2/owldesar/public_html/app/view/handler/ajax.handler.class.php on line 13
+[09-Aug-2021 23:16:15 UTC] PHP Deprecated:  Non-static method controllerAdd::login() should not be called statically in /home2/owldesar/public_html/app/view/handler/ajax.handler.class.php on line 96
+[09-Aug-2021 23:16:22 UTC] PHP Deprecated:  Non-static method includes::_includePHP() should not be called statically in /home2/owldesar/public_html/app/view/handler/ajax.handler.class.php on line 13
+[09-Aug-2021 23:16:22 UTC] PHP Deprecated:  Non-static method controllerAdd::login() should not be called statically in /home2/owldesar/public_html/app/view/handler/ajax.handler.class.php on line 96
+[09-Aug-2021 23:16:42 UTC] PHP Deprecated:  Non-static method includes::_includePHP() should not be called statically in /home2/owldesar/public_html/app/view/handler/ajax.handler.class.php on line 13
+[09-Aug-2021 23:16:42 UTC] PHP Deprecated:  Non-static method controllerAdd::login() should not be called statically in /home2/owldesar/public_html/app/view/handler/ajax.handler.class.php on line 96

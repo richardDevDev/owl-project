@@ -1,0 +1,1422 @@
+<?php 
+/**
+* Clase para funciones de consulta ne la base de datos
+
+RESPALDO D EARCHIVO SELECT, donde vienen los procesos antes de cambiar al nuevo metodo de dispensado
+*/
+class selectClass
+{
+	function revisaDinero($data){
+		global $select;
+		$sql["table"]="log_dinero";
+		$sql["expressions"]="`1000`,`500`,`200`,`100`,`50`,`20`,`10`,`5`,`2`,`1`,`50c`,`50cn`";
+		$sql["where"]="id_movimiento='".$data["value"]."'";
+		$result= $select->construct($sql);
+
+		if ($result["no"]=="100") {
+			$result["no"]="202";
+		}
+		return $result;
+	}
+
+	function revisaEstatus($id_movimiento){
+		global $select;
+		$sql=array(
+			"table"=>"movimientos",
+			"where"=>"id_movimiento='".$id_movimiento."'"
+		);
+		$result=$select->construct($sql);
+		if ($result["message"][0]["estatus_movimiento"]=="CANCELADO"||$result["message"][0]["estatus_movimiento"]=="CANCELADO-INACTIVO"||$result["message"][0]["estatus_movimiento"]=="PAGADO") {
+			return $result=array("estatus"=>false,"detalle"=>$result["message"][0]["estatus_movimiento"]);
+		}else{
+			return $result=array("estatus"=>true,"detalle"=>$result["message"][0]["estatus_movimiento"]);
+		}
+	}
+
+	function revisaDineroIngresado($data){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["join"]="left join log_dinero on log_dinero.id_movimiento=movimientos.id_movimiento";
+		$sql["expressions"]="movimientos.estatus,movimientos.id_movimiento,log_dinero.ubicacion,movimientos.tipo_movimiento,`1000`,`500`,`200`,`100`,`50`,`20`,`10`,`5`,`2`,`1`,`50c`,`50cn`";
+		$sql["where"]="movimientos.id_movimiento='".$data["value"]."'";
+		$result= $select->construct($sql);
+		if ($result["no"]=="100") {
+			$result["no"]="202";
+		}
+		return $result;
+	}
+
+	function alarma(){
+		global $mail;
+		global $controllerInsert;
+		$movimiento[0]["kiosko"]="c4ca4238a0b923820dcc509a6f75849b";
+		$movimiento[0]["usuario"]="0";
+		$movimiento[0]["movimiento"]="ALERTA";
+		$movimiento[0]["estatus"]="PAGADO";
+		$result=$controllerInsert->insertMovimiento($movimiento);
+		$niveles=$this->revisaNiveles();
+		if ($niveles["nivelBajo"]==true) {
+			$mail->sendAlert($niveles);
+		}else{
+			
+		}
+
+	}
+
+	function getCorreo(){
+		global $select;
+		$sql["table"]="configuracion";
+		$sql["expressions"]="valor_conf";
+		$sql["where"]="id_conf='1'";
+		$result=$select->construct($sql);
+		return $result["message"][0]["valor_conf"];
+	}
+
+	function revisaNiveles(){
+		$totalDinero=$this->totalDinero();
+		$dineroSeparado=$this->cuentaDinero($totalDinero["message"]);
+		$disponible=$dineroSeparado[0];
+		$validador=false;
+
+		foreach ($disponible as $key => $value) {
+			switch ($key) {
+				case 'M10':
+					if($disponible["M10"]<5){
+						$validador=true;
+					}
+					break;
+				case 'M5':
+					if($disponible["M5"]<5){
+						$validador=true;
+					}
+					break;
+				case 'M2':
+					if($disponible["M2"]<5){
+						$validador=true;
+					}
+					break;
+				case 'M1':
+					if($disponible["M1"]<5){
+						$validador=true;
+					}
+					break;
+				/*case 'M50C':
+					if($disponible["M50C"]<15){
+						$validador=true;
+					}
+					break;*/
+			}
+		}
+		
+
+		if ($validador==true) {
+			$disponible["nivelBajo"]=true;
+		}else{
+			$disponible["nivelBajo"]=false;
+		}
+
+		return $disponible;
+
+	}
+
+	function regresaDinero($data){
+		global $controllerInsert;
+		global $controllerUpdate;
+			$data["ubicacion"]="0";
+			$devolver=$this->getRetiro($data["movimiento"]);
+			if ($devolver["no"]=="100") {
+				$transaccion["vending"]=$data["data_key"];
+				$transaccion["cve_cliente"]="MOSTR";
+				$transaccion["tipo_movimiento"]="DEVOLUCION";
+				$transaccion["estatus"]="COBRAR";
+				$transaccion["id_movimiento_anterior"]=$data["movimiento"];
+				$transaccion["cve_producto"]="";
+				$transaccion["precio"]="";
+
+				$result=$controllerInsert->insertMovimiento($data["movimiento"]);
+
+				$result["devolucion"]=$devolver["message"][0];
+				$result["id_movimiento"]=$result["id"];
+				$controllerInsert->setLogDinero($result);
+				//$this->alarma();
+			}
+	}
+
+	function regresaDineroPanelControl($data){
+		global $controllerInsert;
+		global $controllerUpdate;
+			$data["ubicacion"]="0";
+			$insertado=$this->getRetiro($data["movimiento"]);
+			$cambio=$this->getIngresadoAnterior($data["movimiento"]);
+
+			$data["total"]=$this->cuentaTotal($insertado["message"][0])-$this->cuentaTotal($cambio["message"][0]);
+			$data["data_key"]="c4ca4238a0b923820dcc509a6f75849b";
+			$totalCambio=$this->calculaCambio($data);
+
+			if ($insertado["no"]=="100") {
+				$movimiento[0]["kiosko"]="c4ca4238a0b923820dcc509a6f75849b";
+				$movimiento[0]["usuario"]="0";
+				$movimiento[0]["movimiento"]="DEVOLUCION";
+				$movimiento[0]["estatus"]="INFORMATIVO";
+				$movimiento[0]["anterior"]=$data["movimiento"];
+				$result=$controllerInsert->insertMovimiento($movimiento);
+
+				if ($cambio["no"]=="100") {
+					$result["devolucion"]=$totalCambio;
+				}else{
+					$result["devolucion"]=$insertado["message"][0];;
+				}
+				$result["id_movimiento"]=$result["id"];
+				$controllerInsert->setLogDinero($result);
+				//$this->alarma();
+			}
+	}
+
+	function suma2Array($arr1, $arr2){
+		$arr["B1000"]=$arr1["B1000"]-$arr2["B1000"];
+		$arr["B500"]=$arr1["B500"]-$arr2["B500"];
+		$arr["B200"]=$arr1["B200"]-$arr2["B200"];
+		$arr["B100"]=$arr1["B100"]-$arr2["B100"];
+		$arr["B50"]=$arr1["B50"]-$arr2["B50"];
+		$arr["B20"]=$arr1["B20"]-$arr2["B20"];
+		$arr["M10"]=$arr1["M10"]-$arr2["M10"];
+		$arr["M5"]=$arr1["M5"]-$arr2["M5"];
+		$arr["M2"]=$arr1["M2"]-$arr2["M2"];
+		$arr["M1"]=$arr1["M1"]-$arr2["M1"];
+		$arr["M50C"]=$arr1["M50C"]-$arr2["M50C"];
+		return $arr;
+	}
+
+	function productos(){
+		global $select;
+		$sql["table"]="productos";
+		return $select->construct($sql);
+	}
+
+	function getNombre($clave_cliente){
+		global $select;
+		$sql["table"]="clientes";
+		$sql["expressions"]="nombre";
+		$sql["where"]="cve_cliente='$clave_cliente'";
+		$result=$select->construct($sql);
+		return $result["message"][0]["nombre"];
+	}
+
+	function productosLista($data){
+		global $select;
+		$sql["table"]="productos";
+		$sql["expressions"]="productos.id_productos,
+							productos.clave_articulo,
+							productos.descripcion,
+							productos.imagen,
+							precios.id_precio,
+							precios.precio, sum(ventas.cantidad) as masvendido, productos.id_categoria, productos.estatus";
+		$sql["group"]="clave_articulo order by masvendido DESC";
+
+		$sql["join"]="join precios on productos.clave_articulo=precios.clave_articulo
+						left join ventas on ventas.clave_articulo=productos.clave_articulo";
+
+		if(isset($data["id_lista"])){
+			$sql["where"]="precios.lista_precio=(select lista_precios from clientes where cve_cliente='".$data["id_lista"]."')";
+		}
+
+		if (isset($data["categoria"])) {
+			$sql["where"]="precios.lista_precio=(select lista_precios from clientes where cve_cliente='MOSTR') and productos.id_categoria=".$data["categoria"];
+		}
+		
+		return $select->construct($sql);
+	}
+
+	function categoriasLista(){
+		global $select;
+		$sql["table"]="categorias";
+		$sql["expressions"]="categorias.id_categoria,categorias.nombre_categoria,categorias.descripcion_categoria,
+categorias.imagen_categoria,categorias.estatus_categoria, count(productos.clave_articulo) as cantidad";
+		$sql["join"]="left join productos on categorias.id_categoria=productos.id_categoria";
+		$sql["group"]="categorias.id_categoria";
+		return $select->construct($sql);
+	}
+
+	function categoriasListaVenta(){
+		global $select;
+		$sql["table"]="categorias";
+		$sql["expressions"]="categorias.id_categoria,categorias.nombre_categoria,categorias.descripcion_categoria,
+categorias.imagen_categoria,categorias.estatus_categoria, count(productos.clave_articulo) as cantidad";
+		$sql["join"]="left join productos on categorias.id_categoria=productos.id_categoria";
+		$sql["where"]="productos.estatus=1";
+		$sql["group"]="categorias.id_categoria";
+		return $select->construct($sql);
+	}
+
+	function nombreCategoria($id){
+		global $select;
+		$sql["table"]="categorias";
+		$sql["expressions"]="nombre_categoria";
+		$sql["where"]="id_categoria=$id";
+		$result= $select->construct($sql);
+		return $result["message"][0]["nombre_categoria"];
+	}
+
+	//Obtiene todos los clientes de la base de datos, previamente sincronizados desde FIREBIRD
+	function clientes($data){
+		if (isset($data["nombre"])) {
+			$where="nombre like '%".$data["nombre"]."%'";
+		}
+		if (isset($data["id_cliente"])) {
+			$where="cve_cliente like '%".$data["id_cliente"]."%'";
+		}
+		global $select;
+		$sql["table"]="clientes";
+		$sql["expressions"]="cve_cliente,nombre,estatus,telefono";
+		$sql["where"]=$where;
+		$result= $select->construct($sql);
+		if ($result["no"]=="100") {
+			$result["no"]="001";
+		}
+		return $result;
+	}
+
+	//.NET siempre manda peticiones a la BD para saber en cuanto se realice alguna operacion de compra, o de precarga, es el puente entre la aplicacion PHP y los dispositivos fisicos.
+	function listen($data){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="max(id_movimiento) as 'id_movimiento',tipo_movimiento,estatus_movimiento as estatus,seleccion";
+		$sql["where"]="id_mueble='".$data["data_key"]."' and estatus_movimiento='COBRAR';";
+		$result= $select->construct($sql);
+
+		$id_movimiento=$result["message"][0]["id_movimiento"];
+		if ($result["no"]=="100"&&$result["message"][0]["id_movimiento"]!=null) {
+			$result["type"]="SUCCESS";
+			switch ($result["message"][0]["tipo_movimiento"]) {
+				case 'VENTA':
+					$result["no"]="100";
+					$result["message"]=$result["message"][0]["id_movimiento"];
+					$result["monto"]=$this->getCantidadPagar(Array("movimiento"=>$result["message"]));
+					break;
+				case 'DISPENSADO':
+					$result["no"]="400";
+					$result["message"]["P1"]["id"]=$result["message"][0]["id_movimiento"];
+					$result["message"]["P1"]["SEL"]=$result["message"][0]["seleccion"];
+					$result["message"]["P1"]["TIEM"]="0";
+					break;
+				case 'RETIRO-CONTROL':
+					$retiro=$this->getRetiro($result["message"][0]["id_movimiento"]);
+					
+					$result=$retiro["message"][0];
+					$result["message"]=$id_movimiento;
+					$result["ID"]=$id_movimiento;
+					$result["no"]="109";
+				break;
+
+				case 'DEVOLUCION':
+					$retiro=$this->getRetiro($result["message"][0]["id_movimiento"]);
+					$result=$retiro["message"][0];
+					$result["message"]=$id_movimiento;
+
+					$result["id"]=$id_movimiento;
+					$result["no"]="109";
+				break;
+				case 'CARGA':
+					$result["no"]="300";
+					$result["message"]=$result["message"][0]["id_movimiento"];
+					break;
+				case 'LEER':
+					$result["no"]="110";
+					$result["id"]=$id_movimiento;
+					break;
+				case 'PUERTA':
+					$result["no"]="101";
+					$result["message"]=$result["message"][0]["id_movimiento"];
+					//$result["message"]="SIN MOVIMIENTOS DISPONIBLES";
+					break;
+				case 'INGRESO':
+					$result["no"]="100";
+					$result["message"]=$result["message"][0]["id_movimiento"];
+					//$result["message"]="SIN MOVIMIENTOS DISPONIBLES";
+					break;
+			}
+			
+		}else{
+			$result["no"]="101";
+			$result["type"]="ERROR";
+			$result["message"]="SIN MOVIMIENTOS DISPONIBLES";
+		}
+		
+		return $result;
+		
+	}
+
+	//Revisa el movimiento para saber el estatus_movimiento del mismo, dependiendo de la accion
+	function listenEstatus($data){
+		global $select;
+		
+		$result= $this->getEstatusMovimiento($data["movimiento"]);
+		if ($result["no"]=="100") {
+			switch ($result["message"][0]["estatus"]) {
+				case 'PAGADO':
+					$result["no"]="109";
+					$result["type"]="SUCCESS";
+					$result["message"]="PAGADO";
+					break;
+				case 'CANCELADO':
+					$result["no"]="101";
+					$result["type"]="ERROR";
+					$result["message"]="CANCELADO";
+					break;
+				case 'CANCELADO-INACTIVO':
+					$result["no"]="101";
+					$result["type"]="ERROR";
+					$result["message"]="CANCELADO";
+					break;		
+				default:
+					$result["ingresado"]=$result["message"][0]["ingresado"];
+					$result["total"]=$result["message"][0]["total"];
+					$result["no"]="102";
+					$result["type"]="SUCCESS";
+					$result["message"]="COBRAR";
+					
+					break;
+			}
+		}else{
+			$result["no"]="101";
+			$result["type"]="ERROR";
+			$result["message"]="SIN MOVIMIENTOS DISPONIBLES";
+		}
+		
+		return $result;
+		
+	}
+
+	function getEstatusMovimiento($id_movimiento){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="tipo_movimiento,estatus_movimiento as estatus, ingresado,total";
+		$sql["where"]="id_movimiento='".$id_movimiento."'";
+		return $select->construct($sql);
+	}
+
+	function listenPuerta(){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="max(id_movimiento) as id_movimiento";
+		$sql["where"]="estatus='COBRAR' and tipo_movimiento='PUERTA'";
+		$result=$select->construct($sql);
+		$result["no"]="97";
+		return $result;
+	}
+
+	function listenCambio($id_movimiento){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="estatus";
+		$sql["where"]="tipo_movimiento in ('RETIRO','DEVOLUCION') and id_movimiento_anterior=".$id_movimiento;
+		$result=$select->construct($sql);
+		$result["no"]="102";
+		//var_dump($result);
+		return $result;
+	}
+
+	//Obtiene la cantidad de monedas insertadas revisando los registros en LOG_DINERO de la BD, es capaz de revisar en las 3 posiciones
+	function getLog_Dinero($data){
+		global $select;
+		$sql["table"]="log_dinero";
+		$sql["expressions"]="id_dinero";
+		$sql["where"]="id_movimiento='".$data["movimiento"]."'";
+		if (isset($data["ubicacion"])) {
+			$sql["where"].= " and ubicacion='".$data["ubicacion"]."'";
+		}
+		return $select->construct($sql);
+	}
+
+	function getID($clave){
+		global $select;
+		$sql["table"]="clientes";
+		$sql["expressions"]="id_clientes";
+		$sql["where"]="cve_cliente='".$clave."'";
+		$result=$select->construct($sql);
+		if ($result["no"]=="100") {
+			return $result["message"][0]["id_clientes"];
+		}else{
+			return "0";
+		}
+		
+
+	}
+
+	
+	//Revisa el estatus_movimiento del movimiento al que apunta, recibe data_key del kiosko y el movimiento a monitorear, normalmente cuando el estatus_movimiento es "PAGADO" es cuando se dispara un evento en el UI
+	function getEstatusVenta($data){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="estatus_movimiento as estatus,tipo_movimiento";
+		$sql["where"]="id_mueble='".$data["data_key"]."' and id_movimiento='".$data["movimiento"]."';";
+		return $select->construct($sql);
+	}
+
+	//Revisa el movimiento a pagar y calcula el total en base a la tabla VENTAS, suma la cantidad de productos y el precio de cada uno.
+	function getCantidadPagar($data){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="total as cantidad_pagar";
+		$sql["where"]="id_movimiento='".$data["movimiento"]."'";
+		$result=$select->construct($sql);
+		if ($result["message"][0]["cantidad_pagar"]!=null) {
+			$res=$result["message"][0]["cantidad_pagar"];
+		}else{
+			$res["no"]="112";
+			$res["type"]="ERROR";
+			$res["ms"]=$result["mysql"];
+			$res["message"]="Aun no se puede pagar este movimiento";
+		}
+		return $res;
+	}
+
+	//Obtiene la cantidad que reporta .NET que se ha ingresado, este total no esta desglosado en monedas, es un TOTAL general.
+	function getCantidadIngresada($data){
+		global $select;
+		$data["value"]=$data["movimiento"];
+		$dinero=$this->revisaDinero($data);
+		$total=0;
+		foreach ($dinero["message"] as $key => $value) {
+			foreach ($value as $key2 => $value2) {
+				
+				if ($key2=="50c"||$key2=="50cn") {
+					if ($key2=="50") {
+						$total=$total+$value2*$key2;
+					}else{
+						$total=$total+$value2*(".".$key2);
+					}
+					
+				}else{
+					$total=$total+$value2*$key2;
+				}
+				
+			}
+		}
+		return $total;
+	}
+
+	function sumaArr($data){
+		$total=0;
+		foreach ($data as $key => $value) {
+			$total=$total+$data[$key];
+		}
+		return $total;
+	}
+
+	//Realiza la comprobacion para saber cuando se paga la venta, todas las operaciones por seguridad las realiza el servidor.
+	function compararDinero($data){
+		global $controllerUpdate;
+		global $controllerInsert;
+		$total=$this->getCantidadPagar($data);
+
+		$ingresado=$this->getCantidadIngresada($data);
+		$cambio=floatval($ingresado)-floatval($total);
+		if (floatval($total)<=floatval($ingresado)) {
+			$data["total"]=$total;
+			$data["cambio"]=$cambio;
+			$data["ingresado"]=$ingresado;
+			$res=$controllerUpdate->pagaMovimientoVenta($data);
+			$controllerInsert->entregaMovimiento($data);
+
+			if ($res["type"]=="success") {
+				$data["total"]=$cambio;
+				$result["no"]="109";
+				$result["type"]="SUCCESS";
+				$result["estatus"]="COBRAR";
+				if ($cambio>0) {
+					$result["message"]=$this->calculaCambio($data);
+				}else{
+
+					$result["message"]=0;
+				}
+			}else{
+				$result["no"]="115";
+				$result["type"]="ERROR";
+				$result["message"]="No se ha insertado nada en la BD";
+			}
+			
+			//echo $cambio;
+				
+		}else{
+			//echo $total;
+			//echo $ingresado;
+			$result["no"]="102";
+			$result["type"]="WARNING";
+			$result["message"]="COBRAR";
+			$result["cambio"]=$cambio;
+		}
+		//echo $cambio;
+		return $result;
+	}
+
+	function cuentaProductos($id_movimiento){
+		global $select;
+		$sql["table"]="ventas";
+		$sql["expressions"]="count(*) as cantidad";
+		$sql["where"]="id_movimiento='".$id_movimiento."' and estatus=1;";
+		$result=$select->construct($sql);
+		if ($result["message"][0]["cantidad"]>0) {
+			return $result["message"][0]["cantidad"];
+		}else{
+			return 0;
+		}
+
+	}
+	
+	/*Devuelve la cantidad de dinero que se encuntra en tubos y en reciclador para dar cambio en caso de que no alcance el dinero para dar cambio regresa un mensaje con la cantidad de dinero a deber, para imprimirse en ticket*/
+	function calculaCambio($data){
+		//var_dump($data);
+		$total=$data["total"];
+		global $controllerInsert;
+		global $controllerUpdate;
+		$totalDinero=$this->totalDinero();
+		$disponible=$this->cuentaDinero($totalDinero["message"]);
+		var_dump($totalDinero);
+		var_dump($disponible);
+		//$disponible=$this->getDineroEntregable();
+		$cambio[0]["vending"]=$data["data_key"];
+		if (isset($data["usuario"])) {
+			$cambio[0]["usuario"]=$data["usuario"];
+		}else{
+			$cambio[0]["usuario"]="0";
+		}
+		
+		$cambio[0]["estatus"]="PAGADO";
+		$cambio[0]["movimiento"]=$data["movimiento"];
+		$cambio["B1000"]=0;
+		$cambio["B500"]=0;
+		$cambio["B200"]=0;
+		$cambio["B100"]=0;
+		$cambio["B50"]=0;
+		$cambio["B20"]=0;
+		$cambio["M10"]=0;
+		$cambio["M5"]=0;
+		$cambio["M2"]=0;
+		$cambio["M1"]=0;
+		$cambio["M50C"]=0;
+		$cambio["alert"]=false;
+		$denominaciones= array("B1000","B500","B200","B100","B50","B20","M10","M5","M2","M1","M50C");
+		$i=0;
+		$control=0;
+		while ($total>=.5) {
+			if ($denominaciones[$i]!="M50C") {
+				$conservar = '0-9'; // juego de caracteres a conservar
+				$regex = sprintf('~[^%s]++~i', $conservar); // case insensitive
+				$comparador = preg_replace($regex, '', $denominaciones[$i]);
+			}else{
+				$comparador=.5;
+			}
+			
+
+			if ($total>=$comparador) {
+				if ($total-$comparador>=0) {
+					if ($disponible[0][$denominaciones[$i]]>0) {
+						$disponible[0][$denominaciones[$i]]--;
+						$cambio[$denominaciones[$i]]++;
+						$total-=$comparador;
+						//echo $total." ";
+					}else{
+						$i++;
+						if ($i==11) {
+							$cambio["alert"]=true;
+							break;
+						}
+						
+					}
+					
+				}else{
+					$i++;
+				}
+			}else{
+				$i++;
+			}
+		}
+		//echo $data["total"];
+		if ($cambio["alert"]==false) {
+			if ($this->validacionCambio($data["movimiento"])==false) {
+				$camb= $controllerInsert->insertCambio($cambio);
+				$result=$cambio;
+			}else{
+				$result=false;
+			}
+			
+		}else{
+			$cancela["motivo"]="COMPRA";
+			$cancela["movimiento"]=$data["movimiento"];
+			$cancela["data_key"]=$data["data_key"];
+			$result=$controllerUpdate->cancelaMovimiento($cancela);
+			//var_dump($this->sinCambio($data));
+			/*$result["no"]="600";
+			$result["type"]="ERROR";
+			$result["message"]="No hay suficiente cambio";
+			$result["cambio"]=$data["total"];*/
+			
+		}
+		//var_dump($result);
+		
+		return $result;
+	}
+
+
+	//Valida si ya se registro un movimiento de cambio, no deberia haber 2 registros donde de cambio.
+	function validacionCambio($id_movimiento){
+		global $select;
+		$sql=array(
+			"table"=>"movimientos",
+			"where"=>"tipo_movimiento='RETIRO' and id_movimiento_anterior='".$id_movimiento."'"
+		);
+		$result=$select->construct($sql);
+		if ($result["no"]=="100") {
+			return true;
+		}else{
+			return false;
+		}
+	}
+
+
+	/*Exclusivo de RETIRO-CONTROL:
+	cuando se manda la orden de retirar desde el panel de control pasa lo siguiente:
+	Listen_sale:
+	switch RETIRO-CONTROL
+	devuelve mensaje 108
+	el sistema revisa el id de movimiento para saber cuando va a expulsar.
+	*/
+
+	function getRetiro($id_movimiento){
+		global $select;
+		$sql["table"]="log_dinero";
+		$sql["expressions"]="id_movimiento,ubicacion,`1000` as B1000, `500` as B500, `200` as B200,`100` as B100,`50` as B50, `20` as B20, `10` as M10, `5` as M5,`2` as M2, `1` as M1, `50c` as M50C";
+		$sql["where"]="id_movimiento='".$id_movimiento."'";
+		return $select->construct($sql);
+	}
+
+	function getIngresadoAnterior($id_movimiento){
+		global $select;
+		$sql["table"]="log_dinero";
+		$sql["expressions"]="id_movimiento,ubicacion,`1000` as B1000, `500` as B500, `200` as B200,`100` as B100,`50` as B50, `20` as B20, `10` as M10, `5` as M5,`2` as M2, `1` as M1, `50c` as M50C";
+		$sql["where"]="id_movimiento=(select id_movimiento from movimientos where id_movimiento_anterior='".$id_movimiento."')";
+		return $select->construct($sql);
+	}
+
+	function retirarBolsa($data){
+		global $controllerInsert;
+		global $controllerUpdate;
+		$total=$this->totalDinero();
+		$dinero=$this->cuentaDinero($total["message"]);
+		$movimiento=$controllerInsert->insertMovimiento($data);
+		$insert["id_movimiento"]=$movimiento["id"];
+		$insert["bolsa"]=$dinero[1];
+		$result=$controllerInsert->setLogDinero($insert);
+		//$this->alarma();
+		$pagado=$controllerUpdate->pagaMovimiento(array("movimiento"=>$movimiento["id"]));
+		
+		$pagado["no"]="204";
+		$pagado["message"]=$movimiento["id"];
+		$pagado["fecha"]=$movimiento["fecha"];
+		$pagado["efectivo"]=$dinero[1];
+		$pagado["tipo_movimiento"]="RETIRO-BOLSA";
+		//var_dump($pagado);
+		return $pagado;
+	}
+
+
+	/*Separa el TOTAL del dinero en dispositivo y lo pone en 3 posiciones de un array 
+	0=TUBO/RECICLADOR, 
+	1=CAJA DE GANANCIAS,
+	2=PRE-STACKER Posicion temporal, al final de la operacion mueve a la posicion 0 o 1.
+	3=Total de las 3 primeras posiciones. Se usa en INicio del panel de control y en precarga
+	4=CAJA DE GANANCIAS JSON FORMAT
+	5=Total de efectivo en valor nominal
+	Para manejarlo se requiere un array con las 3 posiciones (0,1,2) llenas de informacion, normalmente se usa con $this->totalDinero()*/
+
+	function cuentaDinero($data){
+		$dinero[0]["B1000"]=0;$dinero[0]["B500"]=0;$dinero[0]["B200"]=0;$dinero[0]["B100"]=0;$dinero[0]["B50"]=0;$dinero[0]["B20"]=0;$dinero[0]["M10"]=0;$dinero[0]["M5"]=0;$dinero[0]["M2"]=0;$dinero[0]["M1"]=0;$dinero[0]["M50C"]=0;$dinero[0]["M50CN"]=0;
+		$dinero[1]["B1000"]=0;$dinero[1]["B500"]=0;$dinero[1]["B200"]=0;$dinero[1]["B100"]=0;$dinero[1]["B50"]=0;$dinero[1]["B20"]=0;$dinero[1]["M10"]=0;$dinero[1]["M5"]=0;$dinero[1]["M2"]=0;$dinero[1]["M1"]=0;$dinero[1]["M50C"]=0;$dinero[1]["M50CN"]=0;
+		$dinero[2]["B1000"]=0;$dinero[2]["B500"]=0;$dinero[2]["B200"]=0;$dinero[2]["B100"]=0;$dinero[2]["B50"]=0;$dinero[2]["B20"]=0;$dinero[2]["M10"]=0;$dinero[2]["M5"]=0;$dinero[2]["M2"]=0;$dinero[2]["M1"]=0;$dinero[2]["M50C"]=0;$dinero[2]["M50CN"]=0;
+		$dinero[3]["B1000"]=0;$dinero[3]["B500"]=0;$dinero[3]["B200"]=0;$dinero[3]["B100"]=0;$dinero[3]["B50"]=0;$dinero[3]["B20"]=0;$dinero[3]["M10"]=0;$dinero[3]["M5"]=0;$dinero[3]["M2"]=0;$dinero[3]["M1"]=0;$dinero[3]["M50C"]=0;$dinero[3]["M50CN"]=0;
+		$dinero[4]["1000"]=0;$dinero[4]["500"]=0;$dinero[4]["200"]=0;$dinero[4]["100"]=0;$dinero[4]["50"]=0;$dinero[4]["20"]=0;$dinero[4]["10"]=0;$dinero[4]["5"]=0;$dinero[4]["2"]=0;$dinero[4]["1"]=0;$dinero[4]["50C"]=0;$dinero[4]["50CN"]=0;
+		$dinero[5]["B1000"]=0;$dinero[5]["B500"]=0;$dinero[5]["B200"]=0;$dinero[5]["B100"]=0;$dinero[5]["B50"]=0;$dinero[5]["B20"]=0;$dinero[5]["M10"]=0;$dinero[5]["M5"]=0;$dinero[5]["M2"]=0;$dinero[5]["M1"]=0;$dinero[5]["M50C"]=0;$dinero[5]["M50CN"]=0;
+
+
+		if ($data!="No Existen Datos Disponibles") {
+			for($i=0;$i<count($data);$i++){
+				switch ($data[$i]["tipo_movimiento"]) {
+					case 'DEVOLUCION':
+					//No tomar en cuenta
+					break;
+
+					case 'RETIRO-BOLSA':
+					case 'RETIRO':
+					case 'RETIRO-CONTROL':
+					
+							$dinero[3]["B1000"]-=$data[$i]["1000"];
+							$dinero[3]["B500"]-=$data[$i]["500"];
+							$dinero[3]["B200"]-=$data[$i]["200"];
+							$dinero[3]["B100"]-=$data[$i]["100"];
+							$dinero[3]["B50"]-=$data[$i]["50"];
+							$dinero[3]["B20"]-=$data[$i]["20"];
+							$dinero[3]["M10"]-=$data[$i]["10"];
+							$dinero[3]["M5"]-=$data[$i]["5"];
+							$dinero[3]["M2"]-=$data[$i]["2"];
+							$dinero[3]["M1"]-=$data[$i]["1"];
+							$dinero[3]["M50C"]-=$data[$i][".50"];
+							$dinero[3]["M50CN"]-=$data[$i][".5"];
+
+							$dinero[$data[$i]["ubicacion"]]["B1000"]-=$data[$i]["1000"];
+							$dinero[$data[$i]["ubicacion"]]["B500"]-=$data[$i]["500"];
+							$dinero[$data[$i]["ubicacion"]]["B200"]-=$data[$i]["200"];
+							$dinero[$data[$i]["ubicacion"]]["B100"]-=$data[$i]["100"];
+							$dinero[$data[$i]["ubicacion"]]["B50"]-=$data[$i]["50"];
+							$dinero[$data[$i]["ubicacion"]]["B20"]-=$data[$i]["20"];
+							$dinero[$data[$i]["ubicacion"]]["M10"]-=$data[$i]["10"];
+							$dinero[$data[$i]["ubicacion"]]["M5"]-=$data[$i]["5"];
+							$dinero[$data[$i]["ubicacion"]]["M2"]-=$data[$i]["2"];
+							$dinero[$data[$i]["ubicacion"]]["M1"]-=$data[$i]["1"];
+							$dinero[$data[$i]["ubicacion"]]["M50C"]-=$data[$i][".50"];
+							$dinero[$data[$i]["ubicacion"]]["M50CN"]-=$data[$i][".5"];
+						break;
+					
+					default:
+							//var_dump($i);
+							$dinero[3]["B1000"]+=$data[$i]["1000"];
+							$dinero[3]["B500"]+=$data[$i]["500"];
+							$dinero[3]["B200"]+=$data[$i]["200"];
+							$dinero[3]["B100"]+=$data[$i]["100"];
+							$dinero[3]["B50"]+=$data[$i]["50"];
+							$dinero[3]["B20"]+=$data[$i]["20"];
+							$dinero[3]["M10"]+=$data[$i]["10"];
+							$dinero[3]["M5"]+=$data[$i]["5"];
+							$dinero[3]["M2"]+=$data[$i]["2"];
+							$dinero[3]["M1"]+=$data[$i]["1"];
+							$dinero[3]["M50C"]+=$data[$i][".50"];
+							$dinero[3]["M50CN"]+=$data[$i][".5"];
+
+							$dinero[$data[$i]["ubicacion"]]["B1000"]+=$data[$i]["1000"];
+							$dinero[$data[$i]["ubicacion"]]["B500"]+=$data[$i]["500"];
+							$dinero[$data[$i]["ubicacion"]]["B200"]+=$data[$i]["200"];
+							$dinero[$data[$i]["ubicacion"]]["B100"]+=$data[$i]["100"];
+							$dinero[$data[$i]["ubicacion"]]["B50"]+=$data[$i]["50"];
+							$dinero[$data[$i]["ubicacion"]]["B20"]+=$data[$i]["20"];
+							$dinero[$data[$i]["ubicacion"]]["M10"]+=$data[$i]["10"];
+							$dinero[$data[$i]["ubicacion"]]["M5"]+=$data[$i]["5"];
+							$dinero[$data[$i]["ubicacion"]]["M2"]+=$data[$i]["2"];
+							$dinero[$data[$i]["ubicacion"]]["M1"]+=$data[$i]["1"];
+							$dinero[$data[$i]["ubicacion"]]["M50C"]+=$data[$i][".50"];
+							$dinero[$data[$i]["ubicacion"]]["M50CN"]+=$data[$i][".5"];
+						break;
+				}
+				
+			}
+			$dinero[4]["1000"]=$dinero[0]["B1000"];
+			$dinero[4]["500"]=$dinero[0]["B500"];
+			$dinero[4]["200"]=$dinero[0]["B200"];
+			$dinero[4]["100"]=$dinero[0]["B100"];
+			$dinero[4]["50"]=$dinero[0]["B50"];
+			$dinero[4]["20"]=$dinero[0]["B20"];
+			$dinero[4]["10"]=$dinero[0]["M10"];
+			$dinero[4]["5"]=$dinero[0]["M5"];
+			$dinero[4]["2"]=$dinero[0]["M2"];
+			$dinero[4]["1"]=$dinero[0]["M1"];
+			$dinero[4]["50C"]=$dinero[0]["M50C"];
+			$dinero[4]["50CN"]=$dinero[0]["M50CN"];
+
+			$dinero[5]["B1000"]=$dinero[3]["B1000"]*1000;
+			$dinero[5]["B500"]=$dinero[3]["B500"]*500;
+			$dinero[5]["B200"]=$dinero[3]["B200"]*200;
+			$dinero[5]["B100"]=$dinero[3]["B100"]*100;
+			$dinero[5]["B50"]=$dinero[3]["B50"]*50;
+			$dinero[5]["B20"]=$dinero[3]["B20"]*20;
+			$dinero[5]["M10"]=$dinero[3]["M10"]*10;
+			$dinero[5]["M5"]=$dinero[3]["M5"]*5;
+			$dinero[5]["M2"]=$dinero[3]["M2"]*2;
+			$dinero[5]["M1"]=$dinero[3]["M1"]*1;
+			$dinero[5]["M50C"]=$dinero[3]["M50C"]*.5;
+			$dinero[5]["M50CN"]=$dinero[3]["M50CN"]*.5;
+
+		}
+		return $dinero;
+	}
+
+	function cuentaTotalfromArray($data){
+		if (isset($data["message"])) {
+			$data=$data["message"];
+		}
+		$total=0;
+		for ($i=0; $i <count($data) ; $i++) { 
+			$total+=$data[$i]["1000"]*1000;
+			$total+=$data[$i]["500"]*500;
+			$total+=$data[$i]["200"]*200;
+			$total+=$data[$i]["100"]*100;
+			$total+=$data[$i]["50"]*50;
+			$total+=$data[$i]["20"]*20;
+			$total+=$data[$i]["10"]*10;
+			$total+=$data[$i]["5"]*5;
+			$total+=$data[$i]["2"]*2;
+			$total+=$data[$i]["1"]*1;
+			$total+=$data[$i]["50c"]*.5;
+			$total+=$data[$i]["50cn"]*.5;
+		}
+		return $total;
+	}
+
+	//Regresa la cantidad de dinero TOTAL que existe en el dispositivo, regrensado la ultima carga, ventas y retiros , NO SEPARA LA INFORMACION
+	function totalDinero(){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["join"]="join log_dinero on log_dinero.id_movimiento=movimientos.id_movimiento";
+		$sql["expressions"]="tipo_movimiento,ubicacion, sum(`1000`) as `1000`,sum(`500`) as `500`,sum(`200`) as `200`,sum(`100`) as `100`,sum(`50`) as `50`,sum(`20`) as `20`,sum(`10`) as `10`,sum(`5`) as `5`,sum(`2`) as `2`,sum(`1`) as `1`,sum(`50c`) as `.50`,sum(`50cn`) as `.5`";
+		$sql["where"]="movimientos.id_movimiento >= (select max(movimientos.id_movimiento) from movimientos where tipo_movimiento='CARGA' and estatus_movimiento in ('PAGADO')) and estatus_movimiento in ('PAGADO','CANCELADO','CANCELADO-CONTROL') and not movimientos.tipo_movimiento in ('LEER')";
+		$sql["group"]="ubicacion,tipo_movimiento";
+		return $select->construct($sql);
+	}
+
+
+	//Realiza la operacion matematica y calcula el dinero disponible en el TUBO/RECICLADOR del monedero y del billetero
+	function getDineroEntregable(){
+		$dinero[0]["B1000"]=0;$dinero[0]["B500"]=0;$dinero[0]["B200"]=0;$dinero[0]["B100"]=0;$dinero[0]["B50"]=0;$dinero[0]["B20"]=0;$dinero[0]["M10"]=0;$dinero[0]["M5"]=0;$dinero[0]["M2"]=0;$dinero[0]["M1"]=0;$dinero[0]["M50C"]=0;$dinero[0]["M50CN"]=0;
+
+		$result=$this->totalDinero();
+		$data=$result["message"];
+		for ($i=0;$i<count($data);$i++){
+			if ($data[$i]["ubicacion"]==0) {
+				if ($data[$i]["tipo_movimiento"]=="RETIRO") {
+					$dinero[0]["B1000"]-=$data[$i]["1000"];
+					$dinero[0]["B500"]-=$data[$i]["500"];
+					$dinero[0]["B200"]-=$data[$i]["200"];
+					$dinero[0]["B100"]-=$data[$i]["100"];
+					$dinero[0]["B50"]-=$data[$i]["50"];
+					$dinero[0]["B20"]-=$data[$i]["20"];
+					$dinero[0]["M10"]-=$data[$i]["10"];
+					$dinero[0]["M5"]-=$data[$i]["5"];
+					$dinero[0]["M2"]-=$data[$i]["2"];
+					$dinero[0]["M1"]-=$data[$i]["1"];
+					$dinero[0]["M50C"]-=$data[$i][".50"];
+				}else{
+					$dinero[0]["B1000"]+=$data[$i]["1000"];
+					$dinero[0]["B500"]+=$data[$i]["500"];
+					$dinero[0]["B200"]+=$data[$i]["200"];
+					$dinero[0]["B100"]+=$data[$i]["100"];
+					$dinero[0]["B50"]+=$data[$i]["50"];
+					$dinero[0]["B20"]+=$data[$i]["20"];
+					$dinero[0]["M10"]+=$data[$i]["10"];
+					$dinero[0]["M5"]+=$data[$i]["5"];
+					$dinero[0]["M2"]+=$data[$i]["2"];
+					$dinero[0]["M1"]+=$data[$i]["1"];
+					$dinero[0]["M50C"]+=$data[$i][".50"];
+				}
+				
+			}
+		}
+
+		return $dinero;
+	}
+
+
+	function cuentaTotal($data){
+		$total=0;
+		foreach ($data as $key => $value) {
+			
+			if ($key=="M50C" || $key=="M50CN") {
+				$key=.50; 
+			}else{
+				$key=intval(preg_replace('/[^0-9]+/', '', $key), 10); 
+			}
+			
+			$total= $total+$value*$key;
+		}
+		return $total;
+	}
+
+	function toFixed($number, $decimals) {
+	  return number_format($number, $decimals, ".", "");
+	}
+
+	//Evento disparado de puerta abierta, recibe UBICACION 1=Abierta 0=Cerrada, handler="puerta_abierta"
+	function puerta($data){
+		global $controllerInsert;
+		global $controllerUpdate;
+		global $mail;
+		if ($data["ubicacion"]==1) {
+			$puertaData[0]["kiosko"]=$data["data_key"];
+			$puertaData[0]["usuario"]="0";
+			$puertaData[0]["movimiento"]="PUERTA";
+			$puertaData[0]["estatus"]="COBRAR";
+			
+			$result=$controllerInsert->insertMovimiento($puertaData);
+
+
+		}else{
+			$result=$controllerUpdate->pagaMovimiento($data);
+		}
+		return $result;
+	}
+
+	//En caso de que se detecte que no existe la cantidad de dinero suficiente para regresar cambio tambien se ejecuta esta accion, indicando en el log que hubo un caso SINCAMBIO, en la informacion se envia SINCAMBIO, el id del movimiento el cual disparo la advertencia y la cantidad a deber.
+	function sinCambio($data){
+		global $controllerInsert;
+		$transaccion["vending"]=$data["data_key"];
+		$transaccion["cve_cliente"]="MOSTR";
+		$transaccion["tipo_movimiento"]="SINCAMBIO";
+		$transaccion["estatus"]="Cambio-".$data["total"];
+		$transaccion["id_movimiento_anterior"]=$data["movimiento"];
+		$transaccion["cve_producto"]="";
+		$transaccion["precio"]="";
+
+		
+		return $controllerInsert->insertMovimiento($sin);
+
+	}
+
+	/*Obtiene la lista de todos los usuarios.
+	Uso: Control/Usuarios Sistema
+	*/
+	function getUsuarios(){
+		global $select;
+		$sql["table"]="usuarios";
+		$sql["expressions"]="id_usuario,nombre,user,rol";
+		return $select->construct($sql);
+	}
+
+	/*Obtiene la informacion de un cliente SAE, usando su CVE_CLIENTE
+	Uso: Control/Usuarios SAE/Detalle de Usuarios 
+	*/
+	function getUsuarioData($data){
+		global $select;
+		$sql["table"]="clientes";
+		$sql["expressions"]="id_clientes,cve_cliente,correo,estatus,nombre,rfc,calle,credito,num,colonia,cp,municipio,estado,telefono,saldo,lista_precios";
+		$sql["where"]="cve_cliente='".$data["clave"]."'";
+		return $select->construct($sql);
+	}
+
+	/*Obtiene parametros del catalogo de sistema como roles, estatus
+	Usos:
+	1 Obtiene Roles de Usuarios de Sistema
+	*/
+	function getCatalogo_Sistema($tipo){
+		global $select;
+		$sql["table"]="catalogo_sistema";
+		$sql["expressions"]="id_catalogo as id,nombre_catalogo as val";
+		$sql["where"]="tipo_catalogo=$tipo";
+		return $select->construct($sql);
+	}
+
+
+	/*Obtiene parametros de configuracion guardados en la base de datos
+	Usos:
+	1 Rutas SAE
+	2 COnfiguracion SAE
+	*/
+	function getConfiguracion($id_configuracion){
+		global $select;
+		$sql["table"]="configuracion";
+		$sql["where"]="tipo_conf=".$id_configuracion;
+		return $select->construct($sql);
+		
+
+	}
+
+	/*Comprueba si un movimiento ya ha sido entregado
+	Si esta entregado devuelve false
+	No esta entregado devuelve true
+	*/
+	function revisaCancelacion($id_movimiento){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="entregado";
+		$sql["where"]="id_movimiento='".$id_movimiento."' and entregado=1";
+		$result=$select->construct($sql);
+		if ($result["no"]=="100") {
+			return false;
+		}else{
+			return true;
+		}
+
+	}
+
+	/*Obtiene informacion acerca de un movimiento, incluyendo si ya fue entregado o no
+	Usos: 
+	1 Reportes/Detalle de Folio
+	2 Usuarios/Clientes SAE/Detalle de Folio
+	*/
+	function getEstatusEntrega($id_movimiento){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="movimientos.id_movimiento, movimientos.id_usuario,clientes.nombre, movimientos.fecha_creacion,movimientos.total,movimientos.cambio,movimientos.productos,movimientos.ingresado,movimientos.tipo_movimiento,movimientos.estatus,movimientos.entregado, ventas.clave_articulo,ventas.cantidad,ventas.precio";
+		$sql["where"]="movimientos.id_movimiento='".$id_movimiento."' and movimientos.tipo_movimiento='VENTA' and ventas.estatus=1";
+		$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes left join ventas on ventas.id_movimiento=movimientos.id_movimiento";
+		$result= $select->construct($sql);
+		$result["no"]="003";
+		return $result;
+	}
+
+	/*
+	*/
+	function procesoEntrega($data){
+		$entrega=$this->getEstatusEntrega($data["barcode"]);
+		$data=$entrega["message"];
+		switch ($data["entregado"]) {
+			case 'PAGADO':
+				
+				break;
+			
+			default:
+				# code...
+				break;
+		}
+	}
+
+
+	function ultimasVentas($data){
+		global $select;
+		$sql["table"]="movimientos";
+		
+		if (isset($data["limite"])) {
+			$sql["expressions"]="movimientos.id_movimiento, movimientos.id_usuario,clientes.nombre, movimientos.fecha_creacion,movimientos.total,movimientos.cambio,movimientos.productos,movimientos.ingresado,movimientos.entregado";
+			$sql["where"]="movimientos.tipo_movimiento='VENTA' and movimientos.estatus='PAGADO'";
+			$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes";
+
+			if ($data["limite"]=="*") {
+				$sql["order"]="movimientos.id_movimiento DESC";
+			}else{
+				$sql["order"]="movimientos.id_movimiento DESC limit ".$data["limite"];
+			}
+			
+		}
+
+		if (isset($data["id_usuario"])) {
+			$sql["expressions"]="movimientos.id_movimiento,clientes.nombre, movimientos.fecha_creacion, entregado,movimientos.total,movimientos.cambio,movimientos.productos,movimientos.ingresado,movimientos.entregado";
+			$sql["where"]="movimientos.tipo_movimiento='VENTA' and movimientos.estatus='PAGADO' and id_usuario=".$data["id_usuario"];
+			$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes";
+			$sql["order"]="movimientos.id_movimiento DESC limit ".$data["registros"];
+		}
+
+		if (isset($data["rango"])) {
+			$date=explode("-", $data["rango"]);
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d", strtotime($date[0]))." 00:00:00' and '".date("Y-m-d", strtotime($date[1]))." 23:59:59'";
+		}else{
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d")." 00:00:00' and '".date("Y-m-d")." 23:59:59'";
+		}
+
+
+		return $select->construct($sql);
+	}
+
+	function reporteVentas($data){
+		global $select;
+		$sql["table"]="movimientos";
+		
+		$sql["expressions"]="movimientos.id_movimiento, movimientos.fecha_creacion, movimientos.total, movimientos.cambio, movimientos.ingresado,movimientos.entregado ,ventas.clave_articulo, ventas.cantidad, ventas.precio";
+		$sql["where"]="movimientos.tipo_movimiento='VENTA' and movimientos.estatus='PAGADO'";
+		$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes left join ventas on ventas.id_movimiento=movimientos.id_movimiento";
+		
+
+		if (isset($data["rango"])) {
+			$date=explode("-", $data["rango"]);
+			$sql["where"].=" and movimientos.fecha_creacion between '".date("Y-m-d", strtotime($date[0]))." 00:00:00' and '".date("Y-m-d", strtotime($date[1]))." 23:59:59'";
+		}else{
+			$sql["where"].=" and movimientos.fecha_creacion between '".date("Y-m-d")." 00:00:00' and '".date("Y-m-d")." 23:59:59'";
+		}
+
+
+		return $select->construct($sql);
+	}
+
+	function ultimosEventos($data){
+		global $select;
+		$sql["table"]="movimientos";
+		
+		if (isset($data["limite"])) {
+			$sql["expressions"]="movimientos.id_movimiento, movimientos.tipo_movimiento, movimientos.fecha_creacion";
+			$sql["where"]="not movimientos.tipo_movimiento='VENTA' and movimientos.estatus='PAGADO' and not movimientos.tipo_movimiento='ALERTA'";
+			$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes";
+
+			if ($data["limite"]=="*") {
+				$sql["order"]="movimientos.id_movimiento DESC";
+			}else{
+				$sql["order"]="movimientos.id_movimiento DESC limit ".$data["limite"];
+			}
+			
+		}
+
+		if (isset($data["id_usuario"])) {
+			$sql["expressions"]="movimientos.id_movimiento, movimientos.fecha_creacion, movimientos.tipo_movimiento";
+			$sql["where"]="not movimientos.tipo_movimiento='VENTA' and movimientos.estatus='PAGADO' and id_usuario=".$data["id_usuario"];
+			$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes";
+			$sql["order"]="movimientos.id_movimiento DESC limit ".$data["registros"];
+		}
+
+		if (isset($data["rango"])) {
+			$date=explode("-", $data["rango"]);
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d", strtotime($date[0]))." 00:00:00' and '".date("Y-m-d", strtotime($date[1]))." 23:59:59'";
+		}else{
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d")." 00:00:00' and '".date("Y-m-d")." 23:59:59'";
+		}
+
+
+		return $select->construct($sql);
+	}
+
+
+	function ultimasCancelaciones($data){
+		global $select;
+		$sql["table"]="movimientos";
+		
+		if (isset($data["limite"])) {
+			$sql["expressions"]="movimientos.id_movimiento, movimientos.id_usuario,clientes.nombre, movimientos.fecha_creacion,movimientos.fecha_modificacion,movimientos.total,movimientos.cambio,movimientos.productos,movimientos.ingresado";
+			$sql["where"]="movimientos.tipo_movimiento='VENTA' and movimientos.estatus_movimiento in ('CANCELADO-CONTROL')";
+			$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes";
+
+			if ($data["limite"]=="*") {
+				$sql["order"]="movimientos.id_movimiento DESC";
+			}else{
+				$sql["order"]="movimientos.id_movimiento DESC limit ".$data["limite"];
+			}
+			
+		}
+
+		if (isset($data["id_usuario"])) {
+			$sql["expressions"]="movimientos.id_movimiento,clientes.nombre, movimientos.fecha_creacion, entregado,movimientos.total,movimientos.cambio,movimientos.productos,movimientos.ingresado";
+			$sql["where"]="movimientos.tipo_movimiento='VENTA' and movimientos.estatus_movimiento in ('CANCELADO-CONTROL') and id_usuario=".$data["id_usuario"];
+			$sql["join"]="left join clientes on movimientos.id_usuario=clientes.id_clientes";
+			$sql["order"]="movimientos.id_movimiento DESC limit ".$data["registros"];
+		}
+
+		if (isset($data["rango"])) {
+			$date=explode("-", $data["rango"]);
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d", strtotime($date[0]))." 00:00:00' and '".date("Y-m-d", strtotime($date[1]))." 23:59:59'";
+		}else{
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d")." 00:00:00' and '".date("Y-m-d")." 23:59:59'";
+		}
+
+
+		return $select->construct($sql);
+	}
+
+
+
+	function estadisticasVentasxDia(){
+		global $select;
+
+		$fecha = date('Y-m-j');
+		$inifecha = strtotime ( '-13 day' , strtotime ( $fecha ) ) ;
+		$inifecha = date ( 'Y-m-j' , $inifecha );
+
+		$sql["table"]="movimientos";
+		$sql["expressions"]="DATE_FORMAT(fecha_creacion,'%d-%m-%Y') as fecha,sum(ventas.precio) as total";
+		$sql["join"]="join ventas on movimientos.id_movimiento=ventas.id_movimiento";
+		$sql["where"]="tipo_movimiento='VENTA' and movimientos.estatus='PAGADO' and ventas.estatus=1 
+		and movimientos.fecha_creacion between '".$inifecha." 00:00:00' and '".date("Y-m-d")." 23:59:59'
+		group by day(movimientos.fecha_creacion) order by movimientos.fecha_creacion ASC;";
+
+		return $select->construct($sql);
+	}
+
+
+	function estadisticasxProducto($data){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="ventas.clave_articulo,categorias.nombre_categoria,precios.precio,sum(ventas.cantidad) as cantidad,sum(ventas.precio) as total";
+		$sql["join"]="join ventas on movimientos.id_movimiento=ventas.id_movimiento
+						join productos on productos.clave_articulo=ventas.clave_articulo
+						join categorias on categorias.id_categoria=productos.id_categoria
+						join precios on precios.clave_articulo=productos.clave_articulo";
+		$sql["where"]="tipo_movimiento='VENTA' and movimientos.estatus='PAGADO'";
+		$sql["group"]="ventas.clave_articulo order by nombre_categoria, clave_articulo";
+
+		if (isset($data["rango"])) {
+			$date=explode("-", $data["rango"]);
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d", strtotime($date[0]))." 00:00:00' and '".date("Y-m-d", strtotime($date[1]))." 23:59:59'";
+		}else{
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d")." 00:00:00' and '".date("Y-m-d")." 23:59:59'";
+		}
+
+		return $select->construct($sql);
+	}
+
+	function reportexProducto($data){
+		global $select;
+		if (isset($data["id_usuario"])) {
+			$sql["table"]="movimientos";
+			$sql["expressions"]="ventas.clave_articulo,sum(ventas.precio) as total";
+			$sql["join"]="join ventas on movimientos.id_movimiento=ventas.id_movimiento";
+			$sql["where"]="tipo_movimiento='VENTA' and movimientos.estatus='PAGADO' and movimientos.id_usuario=".$data["id_usuario"];
+			$sql["group"]="ventas.clave_articulo";
+		}
+
+		if (isset($data["rango"])) {
+			$date=explode("-", $data["rango"]);
+			$sql["where"].=" and fecha_creacion between '".date("Y-m-d", strtotime($date[0]))." 00:00:00' and '".date("Y-m-d", strtotime($date[1]))." 23:59:59'";
+		}
+		
+		return $select->construct($sql);
+	}
+
+
+	function detalleTicket($id_movimiento){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["where"]="id_movimiento=".$id_movimiento;
+		return $select->construct($sql);
+		
+	}
+
+	function detalleTicketEvento($id_movimiento){
+		global $select;
+		$sql["table"]="log_dinero";
+		$sql["expressions"]="`1000`,`500`,`200`,`100`,`50`,`20`,`10`,`5`,`2`,`1`,`50c`,`50cn`";
+		$sql["where"]="id_movimiento=".$id_movimiento;
+		$result=$select->construct($sql);
+		$result["no"]="004";
+		return $result;
+	}
+
+	function getMovimientos(){
+		global $select;
+		$sql["table"]="movimientos";
+		return $select->construct($sql);
+	}
+
+	function getFoliosMax(){
+		global $select;
+		$sql["table"]="movimientos";
+		$sql["expressions"]="tipo_movimiento, estatus,max(id_movimiento) as folio,count(*) as cantidad";
+		$sql["group"]="tipo_movimiento, estatus";
+		return $select->construct($sql);
+	}
+
+	function ultimaPrecarga(){
+		global $select;
+		$sql["table"]="log_dinero";
+		$sql["where"]=" id_movimiento = (select max(id_movimiento) from movimientos where tipo_movimiento='CARGA' and estatus='PAGADO')";
+		return $select->construct($sql);
+	}
+
+	function getStatuslogin($data){
+		global $select;
+		$sql["table"]="kioskos";
+		$sql["expresions"]="estatus";
+		$sql["where"]="data_key='".$data["data-key"]."'";
+		$result=$select->construct($sql);
+		return $result["message"][0]["estatus"];
+	}
+
+	function cashout($data){
+		global $controllerInsert;
+
+	}
+
+	function excelSae($data){
+		global $select;
+		$sql["table"]="vw_ventas";
+		$sql["where"]="fecha_creacion between '".$data["ini"]." 00:00:00' and '".$data["fin"]." 23:59:59'";
+		return $select->construct($sql);
+	}
+
+	function categoriasOption(){
+    	global $select;
+    	$sql["table"]="categorias";
+    	$sql["expressions"]="id_categoria as id, nombre_categoria as val";
+    	$sql["where"]="estatus_categoria=1";
+    	return $select->construct($sql);
+    }
+
+    function catalogoListaPrecios(){
+    	global $select;
+    	$sql["table"]="catalogo_lista_precios";
+    	return $select->construct($sql);
+    }
+
+    function eventos(){
+		global $select;
+    	$sql["table"]="vw_movimientos";
+    	$sql["limit"]="100";
+    	return $select->construct($sql);
+
+    }
+
+
+    function getStatusKiosko($data_key){
+    	/** Maquina Vending Information.
+	     *  Obtiene informacion de la Maquina Vending que va a realizar operaciones en el servidor, esta key se obtiene del archivo de licencia encriptado, se guarda en una COOKIE dentro del equipo HOST.
+	     */
+
+    	/**
+		 * @return array $result["type"]
+		 *  Si la key coincide con el registro en la base de datos, regresa TRUE.
+		*/
+    	global $select;
+    	$sql=array("table"=>"vendingMachines",
+    		"expressions"=>"fecha_creacion",
+    		"where"=>"data_key='".$data_key."'");
+    	$result=$select->construct($sql);
+    	if ($result["type"]=="success") {
+    		return true;
+    	}else{
+    		return false;
+    	}
+    }
+
+    function getPaymentInformation($data){
+    	/** Obtiene informacion de la venta.
+	     *  El Front End solo envia via AJAX el id_producto del producto que se va a comprar, con este dato y la informacion de la cookie de que usuario pretende realzar la compra podemos saber el precio del producto y su seleccion.
+	     */
+
+    	/**
+		 * @param int $data["id_producto"]
+		 *  ID del producto que desea el usuario comprar.
+		 * @param string $data["cve_cliente"]
+		 *  Clave del usuario logeado que desea comprar, si no hay login el usuario por default es "MOSTR".
+		 * @return array $result["message"][0]
+		 *  Retorna un array con la informacion del producto, siempre regresa la posicion 0.
+		*/
+
+    	global $select;
+    	$sql=array(
+    		"table"=>"clientes",
+    		"expressions"=>"productos.id_productos,clientes.cve_cliente,precios.clave_articulo,precios.lista_precio,precios.precio,productos.id_categoria,productos.estatus",
+    		"join"=>"
+    				JOIN precios ON precios.lista_precio=clientes.lista_precios 
+					right JOIN productos ON productos.clave_articulo=precios.clave_articulo
+					JOIN selecciones ON selecciones.id_producto=productos.id_productos
+					JOIN vendingMachines ON vendingMachines.id_vending=selecciones.id_vending",
+					"where"=>"id_productos='".$data["id_producto"]."' and clientes.cve_cliente='".$data["cve_cliente"]."'");
+    	$result=$select->construct($sql);
+    	return $result["message"][0];
+    }
+
+    function getSelectionInformation($id_movimiento){
+    	global $select;
+    	$sql=array(
+    		"table"=>"movimientos",
+    		"expressions"=>"seleccion",
+    		"where"=>"id_movimiento='".$id_movimiento."'"
+    	);
+    	$result=$select->construct($sql);
+    	return $result["message"][0]["seleccion"];
+    }
+
+    function getClaveProducto($id_producto){
+    	/** Obtiene la clave del producto.
+	     *  Obtiene la clave del producto en formato varchar a partir de su ID, ultiizado principalmente para insertMovimiento();.
+	     */
+
+    	/**
+		 * @param int $$id_producto
+		 *  ID del producto que desea el usuario comprar, este es enviado desde el FRONTEND en un input hidden.
+		 * @return array $result["message"][0]
+		 *  Retorna solamente la clave del producto desde la tabla "productos" y el campo de la tabla "clave_articulo"
+		*/
+
+    	global $select;
+    	$sql=array(
+    		"table"=>"productos",
+    		"expressions"=>"clave_articulo",
+    		"where"=>"id_productos='".$id_producto."'");
+    	$result=$select->construct($sql);
+    	return $result["message"][0]["clave_articulo"];
+    }
+
+}
+
+?>

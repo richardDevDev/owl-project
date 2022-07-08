@@ -1,0 +1,28 @@
+body{
+	background-image: url(../img/login-bg.jpg);
+	background-size: 100% 100vh;
+}
+.login-box{
+  color: #fff;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    margin-top: 10rem;
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 5px;
+    font-size: 20px;
+}
+
+.login-box .image{
+  margin-bottom: 1vh;
+}
+
+.login-box input{
+    height: 40px;
+    
+}
+
+.footer{
+	padding-bottom: 5vh;
+	color: #fff;
+	text-align: center;
+}

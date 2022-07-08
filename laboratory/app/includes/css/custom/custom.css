@@ -1,0 +1,449 @@
+.compraBtn{
+	border-radius: 10px;
+	cursor: pointer;
+}
+
+.element-background{
+	background: #ffffff;
+	background: -moz-linear-gradient(top, #ffffff 0%, #e8e6e3 100%);
+	background: -webkit-gradient(left top, left bottom, color-stop(0%, #ffffff), color-stop(100%, #e8e6e3));
+	background: -webkit-linear-gradient(top, #ffffff 0%, #e8e6e3 100%);
+	background: -o-linear-gradient(top, #ffffff 0%, #e8e6e3 100%);
+	background: -ms-linear-gradient(top, #ffffff 0%, #e8e6e3 100%);
+	background: linear-gradient(to bottom, #ffffff 0%, #e8e6e3 100%);
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#e8e6e3', GradientType=0 );
+}
+
+.white-background{
+	background: #ffffff;
+}
+
+.panelCompra{
+	position: relative;
+	height: 85vh;
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.panelCompraVertical{
+	position: relative;
+	height: 22vh;
+	border-radius: 10px;
+	overflow: hidden;
+}
+
+.shadowIn{
+	-webkit-box-shadow: inset 0px 0px 64px -25px rgba(0,0,0,0.75);
+	-moz-box-shadow: inset 0px 0px 64px -25px rgba(0,0,0,0.75);
+	box-shadow: inset 0px 0px 64px -25px rgba(0,0,0,0.75);
+}
+
+.shadowOut{
+	-webkit-box-shadow: 0px 6px 24px -2px rgba(0,0,0,0.75);
+	-moz-box-shadow: 0px 6px 24px -2px rgba(0,0,0,0.75);
+	box-shadow: 0px 6px 24px -2px rgba(0,0,0,0.75);
+	
+}
+
+
+/*.selected:after {
+  content: " ";
+  z-index: 10;
+  display: block;
+  position: absolute;
+  height: 100%;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: rgba(50, 255, 126,.5);
+}*/
+
+
+.selectedS{
+	border-color: "yellow";
+	border-width: 2px;
+	background-color: #dfe6e9;
+}
+
+
+
+@keyframes bord{
+	0%{
+		border: 0px solid #FEDD92;
+	}
+	50%{
+		border: 3px solid #FEDD92;
+	}
+	100%{
+		border: 0px solid #FEDD92;
+	}
+}
+
+
+.container-products{
+	height: 62vh;
+	overflow: scroll;
+}
+
+.container-products::-webkit-scrollbar { 
+    display: none; 
+}
+
+.header{
+	height: 10vh;
+	padding: 8px 0px 8px 0px;
+}
+
+.headerV{
+	padding: 8px 0px 8px 0px;
+}
+
+.input-custom{
+
+}
+
+.labelPrice-box{
+	width: 100%;
+
+}
+
+.labelPrice-price{
+	font-size: 30pt;
+	font-weight: bold;
+	color: #fff;
+	background-color: #6E6C67;
+	padding: 16px 0px 16px 0px;
+	border-radius: 15px !important;
+
+}
+
+.aceptados{
+	border-radius: 15px;
+	padding: 8px 12px 8px 12px;
+	color: #6E6C67 !important;
+	font-weight: bold;
+}
+
+/*.application{background-image: url("/app/assets/img/sys/background/background.png");}*/
+#application{
+	background-color: #686de0;
+	position: relative;
+}
+
+.product-img {
+  position: relative;
+  cursor: pointer;
+  height: 137px;
+}
+
+#coin {
+  transition: -webkit-transform 1s ease-in;
+  -webkit-transform-style: preserve-3d;
+}
+#coin div {
+  position: absolute;
+  -webkit-backface-visibility: hidden;
+}
+.side-a {
+  z-index: 100;
+  size: 80%
+}
+.side-b {
+  -webkit-transform: rotateY(-180deg);
+	size: 80%
+}
+
+#coin.heads {
+  -webkit-animation: flipHeads 5s ease-out forwards;
+  -moz-animation: flipHeads 5s ease-out forwards;
+    -o-animation: flipHeads 5s ease-out forwards;
+       animation: flipHeads 5s ease-out forwards;
+}
+#coin.tails {
+  -webkit-animation: flipTails 5s ease-out forwards;
+  -moz-animation: flipTails 5s ease-out forwards;
+    -o-animation: flipTails 5s ease-out forwards;
+       animation: flipTails 5s ease-out forwards;
+}
+
+.bill-bar{
+	background-color: #fff;
+}
+.cashless-bar{
+	background-color: #fff;
+}
+
+.total-box{
+	background-color: #6E6C67;
+	
+	border-radius: 15px;
+	
+}
+.timer-label{
+	font-size: 7pt;
+	background-color: #fff;
+}
+
+.label-operacion{
+	font-size: 12pt;
+}
+
+.total-box .label{
+	color: #fff;
+	font-size: 24pt;
+	font-weight: bold;
+}
+
+#folio{
+	color: #000;
+	font-size: 20pt;
+}
+
+#seleccion{
+	color: #000;
+	font-size: 20pt;
+}
+
+.float-menu{
+	padding-top: 4px;
+	padding-bottom: 4px;
+	border-radius: 10px;
+	position: absolute;
+	right:46px;
+	top: 16px;
+}
+
+@-webkit-keyframes flipHeads {
+  from { -webkit-transform: rotateY(0); -moz-transform: rotateY(0); transform: rotateY(0); }
+  to { -webkit-transform: rotateY(1800deg); -moz-transform: rotateY(1800deg); transform: rotateY(1800deg); }
+}
+@-webkit-keyframes flipTails {
+  from { -webkit-transform: rotateY(0); -moz-transform: rotateY(0); transform: rotateY(0); }
+  to { -webkit-transform: rotateY(1980deg); -moz-transform: rotateY(1980deg); transform: rotateY(1980deg); }
+}
+
+
+@keyframes anim{
+
+    0% {background-color: #61CAE4;} /*Amarillo*/
+   15% {background-color: #64B45B;} /*Naranja*/
+   30% {background-color: #F6CB53;} /*Negro*/
+   45% {background-color: #B72831;}
+   60% {background-color: #9D5CA1;} /*Otra vez naranja*/
+   75% {background-color: #E65C31;}
+  100% {background-color: #61CAE4;} /*Otra vez amarillo*/
+}
+.anim {
+  animation-name: anim;
+  animation-duration: 15s;
+  animation-iteration-count: infinite;
+}
+
+
+.product-description{}
+.product-price{font-weight: bold;color:#fff; font-size: 22pt;background-color: #000;text-align: center;}
+.product-sku{font-weight: bold;font-style: italic; font-size: 12pt;}
+
+.swipeAnimation{
+	position: absolute;
+	bottom: 20px;
+	right: 30px;
+}
+
+
+/* Space out content a bit */
+
+body {
+    padding-bottom: 20px;
+}
+
+/* Everything but the jumbotron gets side spacing for mobile first views */
+
+.header, .marketing, .footer {
+    padding-right: 15px;
+    padding-left: 15px;
+}
+
+/* Custom page header */
+
+.header {
+    border-bottom: 1px solid #e5e5e5;
+}
+
+/* Make the masthead heading the same height as the navigation */
+
+.header h3 {
+    padding-bottom: 19px;
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 40px;
+}
+
+/* Custom page footer */
+
+.footer {
+    padding-top: 19px;
+    color: #777;
+    border-top: 1px solid #e5e5e5;
+}
+
+/* Customize container */
+
+@media (min-width: 768px) {
+    .container {
+        max-width: 730px;
+    }
+}
+
+.container-narrow>hr {
+    margin: 30px 0;
+}
+
+/* Main marketing message and sign up button */
+
+.jumbotron {
+    text-align: center;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.jumbotron .btn {
+    padding: 14px 24px;
+    font-size: 21px;
+}
+
+.jumbotron figure {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.jumbotron blockquote {
+    border-left: 5px solid gray;
+    text-align: left;
+}
+
+/* Supporting marketing content */
+
+.marketing {
+    margin: 40px 0;
+}
+
+.marketing p+h4 {
+    margin-top: 28px;
+}
+
+/* Responsive: Portrait tablets and up */
+
+@media screen and (min-width: 768px) {
+    /* Remove the padding we set earlier */
+    .header, .marketing, .footer {
+        padding-right: 0;
+        padding-left: 0;
+    }
+    /* Space out the masthead */
+    .header {
+        margin-bottom: 30px;
+    }
+    /* Remove the bottom border on the jumbotron for visual effect */
+    .jumbotron {
+        border-bottom: 0;
+    }
+}
+
+body.step1 #step2, body.step1 #step3 {
+    display: none;
+}
+
+body.step2 #step1, body.step2 #step3 {
+    display: none;
+}
+
+body.step3 #step1, body.step3 #step2 {
+    display: none;
+}
+
+.alert {
+    display: none;
+}
+
+.jumbotron #step1 video, .jumbotron #step2 figure>img, .jumbotron #step3 figure>canvas {
+    max-width: 100%;
+}
+
+.jumbotron .tooltip {
+    opacity: 1;
+}
+
+.jumbotron .popover {
+    width: 272px;
+}
+
+.popover img {
+    width: 100%;
+}
+
+#step1 figure.not-ready video {
+    border: solid gray 1px;
+    width: 100%;
+    height: 300px;
+}
+
+#step1 figure.not-ready {
+    position: relative;
+}
+
+#step1 figure.not-ready:after {
+    content: 'Please enable the camera.';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -85px;
+    margin-top: -10px;
+}
+
+/* SPINNNER - credit to http://tobiasahlin.com/spinkit/ */
+
+.spinner {
+    margin: 10px auto 10px;
+    width: 70px;
+    text-align: center;
+}
+
+.spinner>div {
+    width: 18px;
+    height: 18px;
+    background-color: #333;
+    border-radius: 100%;
+    display: inline-block;
+    -webkit-animation: sk-bouncedelay 1.4s infinite ease-in-out both;
+    animation: sk-bouncedelay 1.4s infinite ease-in-out both;
+}
+
+.spinner .bounce1 {
+    -webkit-animation-delay: -0.32s;
+    animation-delay: -0.32s;
+}
+
+.spinner .bounce2 {
+    -webkit-animation-delay: -0.16s;
+    animation-delay: -0.16s;
+}
+
+@-webkit-keyframes sk-bouncedelay {
+    0%, 80%, 100% {
+        -webkit-transform: scale(0)
+    }
+    40% {
+        -webkit-transform: scale(1.0)
+    }
+}
+
+@keyframes sk-bouncedelay {
+    0%, 80%, 100% {
+        -webkit-transform: scale(0);
+        transform: scale(0);
+    }
+    40% {
+        -webkit-transform: scale(1.0);
+        transform: scale(1.0);
+    }
+}
